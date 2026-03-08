@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Race Timer</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+:root {
+–bg: #f7f7f7;
+–white: #ffffff;
+–ink: #111111;
+–mid: #555555;
+–light: #cccccc;
+–rule: #e5e5e5;
+–green: #1a8c4e;
+–green-bg: #edf7f2;
+–red: #c0392b;
+–blue: #1a4fa0;
+–amber: #c07c00;
+–mono: ‘IBM Plex Mono’, monospace;
+–sans: ‘IBM Plex Sans’, sans-serif;
+–r: 6px;
+}
+
+- { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+body {
+font-family: var(–sans);
+background: var(–bg);
+color: var(–ink);
+min-height: 100vh;
+padding-bottom: 48px;
+}
+
+.header {
+background: var(–ink);
+color: white;
+padding: 14px 16px 12px;
+display: flex;
+align-items: center;
+justify-content: space-between;
+position: sticky;
+top: 0;
+z-index: 50;
+}
+
+.header-title { font-family: var(–mono); font-size: 15px; font-weight: 600; letter-spacing: 1px; }
+
+.header-clock { font-family: var(–mono); font-size: 20px; font-weight: 600; letter-spacing: 1px; }
+
+.sync-badge {
+font-size: 10px;
+letter-spacing: 1px;
+padding: 2px 8px;
+border-radius: 20px;
+margin-top: 3px;
+display: inline-block;
+}
+.sync-badge.ok  { background: #1a8c4e; color: white; }
+.sync-badge.off { background: #444; color: #bbb; }
+.sync-badge.err { background: var(–red); color: white; }
+
+.page { padding: 12px 12px 0; display: flex; flex-direction: column; gap: 10px; }
+
+.card { background: var(–white); border-radius: var(–r); border: 1px solid var(–rule); overflow: hidden; }
+
+.card-head {
+padding: 10px 14px;
+border-bottom: 1px solid var(–rule);
+font-size: 11px;
+font-weight: 600;
+letter-spacing: 2px;
+text-transform: uppercase;
+color: var(–mid);
+display: flex;
+align-items: center;
+gap: 6px;
+}
+
+.card-body { padding: 12px 14px; }
+
+.btn {
+font-family: var(–sans);
+font-weight: 600;
+font-size: 14px;
+padding: 11px 16px;
+border-radius: var(–r);
+border: none;
+cursor: pointer;
+transition: opacity 0.1s, transform 0.08s;
+display: inline-flex;
+align-items: center;
+justify-content: center;
+gap: 6px;
+white-space: nowrap;
+-webkit-user-select: none;
+user-select: none;
+}
+.btn:active { transform: scale(0.96); opacity: 0.8; }
+
+.btn-black  { background: var(–ink); color: white; }
+.btn-green  { background: var(–green); color: white; }
+.btn-red    { background: var(–red); color: white; }
+.btn-blue   { background: var(–blue); color: white; }
+.btn-outline { background: transparent; border: 1.5px solid var(–light); color: var(–ink); }
+.btn-amber  { background: var(–amber); color: white; }
+.btn-lg { font-size: 16px; padding: 14px 18px; width: 100%; border-radius: 8px; margin-bottom: 8px; }
+.btn-sm { font-size: 12px; padding: 7px 12px; }
+.btn-row { display: flex; gap: 8px; }
+.btn-row .btn { flex: 1; }
+
+.big-time {
+font-family: var(–mono);
+font-size: 34px;
+font-weight: 600;
+text-align: center;
+padding: 10px 0 12px;
+letter-spacing: 2px;
+}
+.big-time.synced { color: var(–green); }
+.big-time.set    { color: var(–green); }
+.big-time.unset  { color: var(–mid); font-size: 20px; padding: 18px 0; }
+
+.sub-row {
+text-align: center;
+font-size: 12px;
+color: var(–mid);
+font-family: var(–mono);
+margin-bottom: 10px;
+min-height: 16px;
+}
+
+.field-row {
+display: flex;
+gap: 8px;
+margin-top: 8px;
+}
+.field-row input {
+flex: 1;
+font-family: var(–mono);
+font-size: 15px;
+padding: 10px 12px;
+border: 1.5px solid var(–rule);
+border-radius: var(–r);
+background: var(–bg);
+color: var(–ink);
+letter-spacing: 1px;
+}
+.field-row input:focus { outline: none; border-color: var(–blue); }
+
+.hint { font-size: 11px; color: var(–mid); margin-top: 6px; line-height: 1.5; }
+
+.vu-row { display: flex; align-items: center; gap: 10px; margin: 10px 0 4px; }
+.vu-label { font-size: 11px; color: var(–mid); font-weight: 600; width: 28px; }
+.vu-track {
+flex: 1; height: 12px; background: var(–bg);
+border: 1px solid var(–rule); border-radius: 20px; overflow: hidden; position: relative;
+}
+.vu-fill {
+height: 100%; width: 0%; border-radius: 20px;
+background: linear-gradient(90deg, var(–green) 0%, #f0c040 70%, var(–red) 100%);
+transition: width 0.04s;
+}
+.thr-line { position: absolute; top: 0; bottom: 0; width: 2px; background: var(–red); opacity: 0.7; }
+
+.slider-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+.slider-item label {
+font-size: 11px; color: var(–mid); font-weight: 600;
+display: flex; justify-content: space-between; margin-bottom: 4px;
+}
+.slider-item label span { font-family: var(–mono); color: var(–blue); }
+input[type=range] { width: 100%; accent-color: var(–ink); }
+
+.status-row {
+margin-top: 10px; padding: 8px 10px; background: var(–bg);
+border-radius: var(–r); font-size: 12px; color: var(–mid);
+display: flex; align-items: center; gap: 8px; min-height: 34px;
+}
+.sdot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(–light); }
+.sdot.on  { background: var(–green); animation: blink 1.2s infinite; }
+.sdot.err { background: var(–red); }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+.lb-tabs { display: flex; border-bottom: 1px solid var(–rule); }
+.lb-tab {
+flex: 1; padding: 9px 4px; font-size: 11px; font-weight: 600;
+letter-spacing: 1px; text-transform: uppercase; color: var(–mid);
+background: none; border: none; cursor: pointer;
+border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.lb-tab.active { color: var(–ink); border-bottom-color: var(–ink); }
+
+.entry-row {
+display: grid;
+grid-template-columns: 40px 1fr auto 32px;
+align-items: center;
+gap: 8px;
+padding: 10px 12px;
+border-bottom: 1px solid var(–rule);
+animation: faderow 0.3s ease;
+}
+.entry-row:last-child { border-bottom: none; }
+.entry-row.best-row { background: var(–green-bg); }
+
+@keyframes faderow { from { background: #fffce0; } to { background: transparent; } }
+
+.entry-rank { font-family: var(–mono); font-size: 16px; font-weight: 600; color: var(–mid); text-align: center; }
+.rank-1 { color: #b8860b; } .rank-2 { color: #888; } .rank-3 { color: #8b5a00; }
+
+.entry-name {
+font-size: 14px; font-weight: 500; color: var(–ink);
+cursor: pointer; min-width: 0; overflow: hidden;
+text-overflow: ellipsis; white-space: nowrap;
+}
+.entry-name-muted { color: var(–mid); font-weight: 400; font-style: italic; }
+.entry-name-input {
+font-family: var(–sans); font-size: 14px; border: none;
+border-bottom: 2px solid var(–blue); background: transparent;
+color: var(–ink); width: 100%; outline: none; padding: 0;
+}
+
+.entry-times { text-align: right; }
+.entry-net { font-family: var(–mono); font-size: 15px; font-weight: 600; color: var(–green); }
+.entry-net.no-gun { color: var(–mid); font-size: 12px; }
+.entry-arrival { font-family: var(–mono); font-size: 11px; color: var(–mid); }
+
+.entry-del {
+background: none; border: none; font-size: 18px;
+color: var(–light); cursor: pointer; padding: 4px; line-height: 1;
+}
+.entry-del:active { color: var(–red); }
+
+.empty-state { text-align: center; padding: 36px 20px; color: var(–mid); font-size: 13px; line-height: 1.8; }
+
+.summary-strip {
+display: grid; grid-template-columns: repeat(3,1fr);
+border-top: 1px solid var(–rule); background: var(–bg);
+}
+.sum-cell { padding: 10px 8px; text-align: center; border-right: 1px solid var(–rule); }
+.sum-cell:last-child { border-right: none; }
+.sum-label { font-size: 10px; color: var(–mid); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+.sum-val { font-family: var(–mono); font-size: 14px; font-weight: 600; margin-top: 2px; }
+
+.export-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.export-grid .btn-outline { border-color: var(–rule); }
+
+/* SPINNERS */
+.spinner-row {
+display: flex;
+align-items: flex-start;
+gap: 4px;
+}
+
+.spinner-group {
+display: flex;
+flex-direction: column;
+align-items: center;
+gap: 4px;
+flex: 1;
+}
+
+.sp-btn {
+width: 100%;
+background: var(–bg);
+border: 1px solid var(–rule);
+border-radius: 4px;
+font-size: 14px;
+line-height: 1;
+padding: 7px 4px;
+cursor: pointer;
+color: var(–ink);
+font-weight: 700;
+-webkit-user-select: none;
+user-select: none;
+}
+.sp-btn:active { background: var(–rule); }
+
+.sp-input {
+width: 100%;
+font-family: var(–mono);
+font-size: 24px;
+font-weight: 600;
+text-align: center;
+padding: 6px 4px;
+border: 1.5px solid var(–rule);
+border-radius: 4px;
+background: var(–white);
+color: var(–ink);
+-moz-appearance: textfield;
+}
+.sp-input::-webkit-inner-spin-button,
+.sp-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+.sp-input:focus { outline: none; border-color: var(–blue); }
+
+.sp-label {
+font-size: 9px;
+font-weight: 700;
+letter-spacing: 2px;
+color: var(–mid);
+}
+
+.sp-sep {
+font-size: 28px;
+font-family: var(–mono);
+font-weight: 600;
+color: var(–mid);
+margin-top: 28px;
+flex-shrink: 0;
+}
+
+.toast {
+position: fixed; bottom: 20px; left: 50%;
+transform: translateX(-50%) translateY(80px);
+background: var(–ink); color: white;
+font-size: 13px; font-weight: 500;
+padding: 10px 22px; border-radius: 30px;
+transition: transform 0.25s ease; z-index: 999; white-space: nowrap;
+pointer-events: none;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+</style>
+
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-title">RACE TIMER</div>
+    <div id="syncBadge" class="sync-badge off">orologio locale</div>
+  </div>
+  <div style="text-align:right">
+    <div class="header-clock" id="liveClock">--:--:--</div>
+    <div style="font-size:10px;color:#888;font-family:var(--mono);margin-top:1px" id="liveMs">.000</div>
+  </div>
+</div>
+
+<div class="page">
+
+  <!-- SINCRONIZZAZIONE -->
+
+  <div class="card">
+    <div class="card-head">🕐 Sincronizzazione Ora</div>
+    <div class="card-body">
+      <div class="big-time" id="syncDisplay">--:--:--.---</div>
+      <div class="sub-row" id="offsetRow">nessun offset</div>
+
+```
+  <div class="btn-row" style="margin-bottom:10px">
+    <button class="btn btn-blue btn-sm" onclick="syncInternet()">🌐 Sync Internet</button>
+    <button class="btn btn-outline btn-sm" onclick="useLocalTime()">📱 Locale</button>
+  </div>
+
+  <div style="font-size:11px;font-weight:600;color:var(--mid);letter-spacing:1px;margin-bottom:6px">IMPOSTA ORA MANUALE</div>
+  <div class="spinner-row">
+    <div class="spinner-group">
+      <button class="sp-btn" onclick="spinChange('sH',1)">▲</button>
+      <input class="sp-input" id="sH" type="number" min="0" max="23" value="0" inputmode="numeric">
+      <button class="sp-btn" onclick="spinChange('sH',-1)">▼</button>
+      <div class="sp-label">ORA</div>
+    </div>
+    <div class="sp-sep">:</div>
+    <div class="spinner-group">
+      <button class="sp-btn" onclick="spinChange('sM',1)">▲</button>
+      <input class="sp-input" id="sM" type="number" min="0" max="59" value="0" inputmode="numeric">
+      <button class="sp-btn" onclick="spinChange('sM',-1)">▼</button>
+      <div class="sp-label">MIN</div>
+    </div>
+    <div class="sp-sep">:</div>
+    <div class="spinner-group">
+      <button class="sp-btn" onclick="spinChange('sS',1)">▲</button>
+      <input class="sp-input" id="sS" type="number" min="0" max="59" value="0" inputmode="numeric">
+      <button class="sp-btn" onclick="spinChange('sS',-1)">▼</button>
+      <div class="sp-label">SEC</div>
+    </div>
+    <button class="btn btn-amber" style="align-self:center;margin-left:8px;padding:10px 14px" onclick="setManualTime()">✓</button>
+  </div>
+  <div class="hint">Guarda <strong>time.is</strong> su un altro dispositivo e inserisci i valori esatti.</div>
+</div>
+```
+
+  </div>
+
+  <!-- GUN START -->
+
+  <div class="card">
+    <div class="card-head">🔫 Gun Start</div>
+    <div class="card-body">
+      <div class="big-time unset" id="gunDisplay">non impostato</div>
+      <button class="btn btn-black btn-lg" onclick="setGunNow()">🔫 GUN NOW</button>
+
+```
+  <div style="font-size:11px;font-weight:600;color:var(--mid);letter-spacing:1px;margin:10px 0 6px">IMPOSTA ORARIO GUN MANUALE</div>
+  <div class="spinner-row">
+    <div class="spinner-group">
+      <button class="sp-btn" onclick="spinChange('gH',1)">▲</button>
+      <input class="sp-input" id="gH" type="number" min="0" max="23" value="0" inputmode="numeric">
+      <button class="sp-btn" onclick="spinChange('gH',-1)">▼</button>
+      <div class="sp-label">ORA</div>
+    </div>
+    <div class="sp-sep">:</div>
+    <div class="spinner-group">
+      <button class="sp-btn" onclick="spinChange('gM',1)">▲</button>
+      <input class="sp-input" id="gM" type="number" min="0" max="59" value="0" inputmode="numeric">
+      <button class="sp-btn" onclick="spinChange('gM',-1)">▼</button>
+      <div class="sp-label">MIN</div>
+    </div>
+    <div class="sp-sep">:</div>
+    <div class="spinner-group">
+      <button class="sp-btn" onclick="spinChange('gS',1)">▲</button>
+      <input class="sp-input" id="gS" type="number" min="0" max="59" value="0" inputmode="numeric">
+      <button class="sp-btn" onclick="spinChange('gS',-1)">▼</button>
+      <div class="sp-label">SEC</div>
+    </div>
+    <button class="btn btn-amber" style="align-self:center;margin-left:8px;padding:10px 14px" onclick="setGunManual()">✓</button>
+  </div>
+  <button class="btn btn-outline btn-sm" style="margin-top:10px;width:100%" onclick="clearGun()">✕ Reset Gun</button>
+</div>
+```
+
+  </div>
+
+  <!-- BEEP -->
+
+  <div class="card">
+    <div class="card-head">🎙 Rilevamento Beep</div>
+    <div class="card-body">
+      <button class="btn btn-green btn-lg" id="btnListen" onclick="toggleListen()">
+        🎙 Attiva Ascolto
+      </button>
+
+```
+  <div class="vu-row">
+    <div class="vu-label">LVL</div>
+    <div class="vu-track">
+      <div class="vu-fill" id="vuFill"></div>
+      <div class="thr-line" id="thrLine" style="left:40%"></div>
+    </div>
+  </div>
+
+  <div class="slider-row">
+    <div class="slider-item">
+      <label>Sensibilità <span id="sensVal">40</span></label>
+      <input type="range" min="1" max="100" value="40" id="sensSlider" oninput="onSens()">
+    </div>
+    <div class="slider-item">
+      <label>Cooldown <span id="coolVal">1.0s</span></label>
+      <input type="range" min="300" max="5000" step="100" value="1000" id="coolSlider" oninput="onCool()">
+    </div>
+  </div>
+
+  <div class="status-row">
+    <div class="sdot" id="sDot"></div>
+    <span id="sText">microfono non attivo</span>
+  </div>
+
+  <button class="btn btn-outline btn-sm" style="margin-top:10px;width:100%" onclick="addManualBeep()">
+    ⊕ Aggiungi arrivo manuale
+  </button>
+</div>
+```
+
+  </div>
+
+  <!-- CLASSIFICA -->
+
+  <div class="card">
+    <div class="card-head">
+      🏁 Classifica
+      <span id="entryCount" style="color:var(--mid);font-weight:400"></span>
+    </div>
+
+```
+<div class="lb-tabs">
+  <button class="lb-tab active" id="tabArr" onclick="setSort('arrival')">Arrivo</button>
+  <button class="lb-tab" id="tabNet" onclick="setSort('net')">Tempo Netto</button>
+  <button class="lb-tab" id="tabGun" onclick="setSort('gun')">Gun Time</button>
+</div>
+
+<div id="lbList">
+  <div class="empty-state">
+    Nessun arrivo ancora.<br>
+    Imposta il <strong>Gun Start</strong> e attiva l'ascolto.
+  </div>
+</div>
+
+<div class="summary-strip">
+  <div class="sum-cell">
+    <div class="sum-label">Totale</div>
+    <div class="sum-val" id="sumCount">—</div>
+  </div>
+  <div class="sum-cell">
+    <div class="sum-label">Migliore</div>
+    <div class="sum-val" id="sumBest">—</div>
+  </div>
+  <div class="sum-cell">
+    <div class="sum-label">Media</div>
+    <div class="sum-val" id="sumAvg">—</div>
+  </div>
+</div>
+```
+
+  </div>
+
+  <!-- ESPORTA -->
+
+  <div class="card">
+    <div class="card-head">📤 Esporta</div>
+    <div class="card-body">
+      <div class="export-grid">
+        <button class="btn btn-green btn-sm" onclick="exportCSV()">⬇ Scarica CSV</button>
+        <button class="btn btn-outline btn-sm" onclick="exportClipboard()">📋 Copia CSV</button>
+        <button class="btn btn-outline btn-sm" onclick="window.print()">🖨 Stampa</button>
+        <button class="btn btn-outline btn-sm" style="color:var(--red)" onclick="clearAll()">🗑 Svuota tutto</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── TIME OFFSET ─────────────────────────────────────────
+let timeOffset = 0;
+let timeSynced = false;
+
+function now() { return Date.now() + timeOffset; }
+
+function fmt(ms) {
+  const d = new Date(ms);
+  return `${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}.${p3(d.getMilliseconds())}`;
+}
+
+function fmtDur(ms) {
+  if (ms == null || ms < 0) return '—';
+  const h = Math.floor(ms/3600000);
+  const m = Math.floor((ms%3600000)/60000);
+  const s = Math.floor((ms%60000)/1000);
+  const c = Math.floor(ms%1000);
+  return h > 0
+    ? `${h}:${p2(m)}:${p2(s)}.${p3(c)}`
+    : `${p2(m)}:${p2(s)}.${p3(c)}`;
+}
+
+function p2(n){ return String(n).padStart(2,'0'); }
+function p3(n){ return String(n).padStart(3,'0'); }
+
+// ── LIVE CLOCK ──────────────────────────────────────────
+(function tick(){
+  const n = now(), d = new Date(n);
+  document.getElementById('liveClock').textContent = `${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}`;
+  document.getElementById('liveMs').textContent = '.'+p3(d.getMilliseconds());
+  document.getElementById('syncDisplay').textContent = fmt(n);
+  requestAnimationFrame(tick);
+})();
+
+// ── SYNC ────────────────────────────────────────────────
+function useLocalTime(){
+  timeOffset = 0; timeSynced = false;
+  badge('off','orologio locale');
+  document.getElementById('offsetRow').textContent = 'nessun offset';
+  toast('Ora locale attiva');
+}
+
+async function syncInternet(){
+  badge('off','sincronizzazione...');
+  document.getElementById('offsetRow').textContent = 'connessione in corso...';
+  // Try multiple APIs in sequence (CORS-friendly)
+  const apis = [
+    async () => {
+      const t0 = Date.now();
+      const r = await fetch('https://timeapi.io/api/time/current/zone?timeZone=UTC', {cache:'no-store'});
+      const t2 = Date.now();
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      const d = await r.json();
+      // d.dateTime = "2024-03-08T14:32:10.123"
+      const serverMs = new Date(d.dateTime + 'Z').getTime();
+      return { serverMs, latency: (t2-t0)/2, t2 };
+    },
+    async () => {
+      const t0 = Date.now();
+      const r = await fetch('https://worldtimeapi.org/api/timezone/UTC', {cache:'no-store'});
+      const t2 = Date.now();
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      const d = await r.json();
+      const serverMs = d.unixtime * 1000;
+      return { serverMs, latency: (t2-t0)/2, t2 };
+    }
+  ];
+  for (const api of apis) {
+    try {
+      const { serverMs, latency, t2 } = await api();
+      timeOffset = (serverMs + latency) - t2;
+      timeSynced = true;
+      badge('ok', `sincronizzato ±${Math.round(latency)}ms`);
+      document.getElementById('offsetRow').textContent = `offset ${timeOffset>=0?'+':''}${timeOffset}ms · latenza ~${Math.round(latency)}ms`;
+      toast(`✓ Sincronizzato! Offset ${timeOffset>=0?'+':''}${timeOffset}ms`);
+      return;
+    } catch(e) { /* try next */ }
+  }
+  badge('err','errore sync');
+  document.getElementById('offsetRow').textContent = 'Errore: nessun server raggiungibile. Usa imposta manuale.';
+  toast('Errore sync — usa impostazione manuale');
+}
+
+// spinner helpers
+function spinChange(id, delta){
+  const el = document.getElementById(id);
+  const max = +el.max, min = +el.min;
+  let v = (+el.value + delta + max + 1) % (max + 1);
+  if(v < min) v = max;
+  el.value = v;
+}
+
+function setManualTime(){
+  const h = +document.getElementById('sH').value;
+  const m = +document.getElementById('sM').value;
+  const s = +document.getElementById('sS').value;
+  const d = new Date(); d.setHours(h, m, s, 0);
+  const t = d.getTime();
+  timeOffset = t - Date.now();
+  timeSynced = true;
+  badge('ok','ora manuale impostata');
+  document.getElementById('offsetRow').textContent = `offset manuale ${timeOffset>=0?'+':''}${timeOffset}ms`;
+  toast(`Ora impostata: ${p2(h)}:${p2(m)}:${p2(s)}`);
+}
+
+function parseTime(str){
+  const m = str.match(/^(\d{1,2}):(\d{2}):(\d{2})(?:[.,](\d{1,3}))?$/);
+  if(!m) return null;
+  const d = new Date();
+  d.setHours(+m[1], +m[2], +m[3], m[4] ? +m[4].padEnd(3,'0') : 0);
+  return d.getTime();
+}
+
+function badge(cls, txt){
+  const b = document.getElementById('syncBadge');
+  b.className = 'sync-badge '+cls;
+  b.textContent = txt;
+}
+
+// ── GUN START ───────────────────────────────────────────
+let gunMs = null;
+
+function setGunNow(){
+  gunMs = now(); updateGun(); recalc();
+  toast('🔫 Gun Start: '+fmt(gunMs).slice(0,12));
+}
+
+function clearGun(){ gunMs = null; updateGun(); recalc(); }
+
+function setGunManual(){
+  const h = +document.getElementById('gH').value;
+  const m = +document.getElementById('gM').value;
+  const s = +document.getElementById('gS').value;
+  const d = new Date(); d.setHours(h, m, s, 0);
+  gunMs = d.getTime();
+  updateGun(); recalc();
+  toast(`Gun Start: ${p2(h)}:${p2(m)}:${p2(s)}`);
+}
+
+function updateGun(){
+  const el = document.getElementById('gunDisplay');
+  if(gunMs){
+    el.textContent = fmt(gunMs).slice(0,12);
+    el.className = 'big-time set';
+  } else {
+    el.textContent = 'non impostato';
+    el.className = 'big-time unset';
+  }
+}
+
+function recalc(){
+  entries.forEach(e => { e.net = gunMs != null ? e.ms - gunMs : null; });
+  renderLB();
+}
+
+// ── ENTRIES ─────────────────────────────────────────────
+let entries = [], eid = 1, sortMode = 'arrival';
+
+function addEntry(ms){
+  entries.push({ id:eid++, ms, str:fmt(ms), net: gunMs!=null ? ms-gunMs : null, name:'' });
+  renderLB();
+}
+
+function addManualBeep(){ addEntry(now()); }
+
+function delEntry(id){ entries = entries.filter(e=>e.id!==id); renderLB(); }
+
+// ── RENDER ──────────────────────────────────────────────
+function setSort(mode){
+  sortMode = mode;
+  ['Arr','Net','Gun'].forEach(t=>document.getElementById('tab'+t).classList.remove('active'));
+  document.getElementById('tab'+{arrival:'Arr',net:'Net',gun:'Gun'}[mode]).classList.add('active');
+  renderLB();
+}
+
+function getSorted(){
+  const a = [...entries];
+  if(sortMode==='arrival') return a.sort((x,y)=>x.ms-y.ms);
+  return a.sort((x,y)=>{
+    if(x.net==null) return 1; if(y.net==null) return -1; return x.net-y.net;
+  });
+}
+
+function renderLB(){
+  const list = document.getElementById('lbList');
+  document.getElementById('entryCount').textContent = entries.length ? `(${entries.length})` : '';
+
+  if(!entries.length){
+    list.innerHTML = `<div class="empty-state">Nessun arrivo ancora.<br>Imposta il <strong>Gun Start</strong> e attiva l'ascolto.</div>`;
+    renderSummary(); return;
+  }
+
+  const sorted = getSorted();
+  const nets = sorted.filter(e=>e.net!=null).map(e=>e.net);
+  const best = nets.length ? Math.min(...nets) : null;
+
+  list.innerHTML = sorted.map((e,i) => {
+    const rank = i+1;
+    const medal = rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':rank;
+    const isBest = e.net!=null && e.net===best;
+    const name = e.name
+      ? e.name
+      : `<span class="entry-name-muted">#${e.id}</span>`;
+
+    return `<div class="entry-row ${isBest?'best-row':''}" id="er-${e.id}">
+      <div class="entry-rank ${rank<=3?'rank-'+rank:''}">${medal}</div>
+      <div>
+        <div class="entry-name" id="en-${e.id}" onclick="editName(${e.id})">${name}</div>
+      </div>
+      <div class="entry-times">
+        <div class="entry-net ${e.net==null?'no-gun':''}">${e.net!=null?fmtDur(e.net):'no gun'}</div>
+        <div class="entry-arrival">${e.str.slice(0,12)}</div>
+      </div>
+      <button class="entry-del" onclick="delEntry(${e.id})">×</button>
+    </div>`;
+  }).join('');
+
+  renderSummary();
+}
+
+function editName(id){
+  const el = document.getElementById('en-'+id);
+  const e = entries.find(x=>x.id===id);
+  if(!e) return;
+  el.innerHTML = `<input class="entry-name-input" value="${e.name}" placeholder="Nome / Pettorale"
+    onblur="saveName(${id},this)" onkeydown="if(event.key==='Enter')this.blur()" autofocus>`;
+  el.querySelector('input').focus();
+}
+
+function saveName(id, inp){
+  const e = entries.find(x=>x.id===id);
+  if(e) e.name = inp.value.trim();
+  renderLB();
+}
+
+function clearAll(){
+  if(entries.length && !confirm('Svuotare tutta la classifica?')) return;
+  entries = []; eid = 1; renderLB();
+}
+
+function renderSummary(){
+  const n = entries.length;
+  document.getElementById('sumCount').textContent = n||'—';
+  const nets = entries.filter(e=>e.net!=null).map(e=>e.net);
+  document.getElementById('sumBest').textContent = nets.length ? fmtDur(Math.min(...nets)) : '—';
+  document.getElementById('sumAvg').textContent  = nets.length ? fmtDur(nets.reduce((a,b)=>a+b,0)/nets.length) : '—';
+}
+
+// ── AUDIO ───────────────────────────────────────────────
+let listening=false, audioCtx, analyser, micStream, vuRaf;
+let sensitivity=40, cooldownMs=1000, lastBeep=0;
+
+async function toggleListen(){ listening ? stopListen() : await startListen(); }
+
+async function startListen(){
+  try {
+    const s = await navigator.mediaDevices.getUserMedia({audio:true, echoCancellation:false});
+    micStream = s;
+    audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 1024;
+    analyser.smoothingTimeConstant = 0.1;
+    audioCtx.createMediaStreamSource(s).connect(analyser);
+    listening = true;
+    const b = document.getElementById('btnListen');
+    b.textContent = '🔴 Stop Ascolto';
+    b.className = 'btn btn-red btn-lg';
+    setStatus('on','in ascolto — attendo beep');
+    vuLoop(); detectLoop();
+  } catch(e) {
+    setStatus('err','Accesso microfono negato');
+    toast('Microfono non disponibile');
+  }
+}
+
+function stopListen(){
+  listening = false;
+  if(micStream) micStream.getTracks().forEach(t=>t.stop());
+  if(audioCtx) audioCtx.close();
+  cancelAnimationFrame(vuRaf);
+  const b = document.getElementById('btnListen');
+  b.textContent = '🎙 Attiva Ascolto';
+  b.className = 'btn btn-green btn-lg';
+  setStatus('','microfono non attivo');
+  document.getElementById('vuFill').style.width = '0%';
+}
+
+function vuLoop(){
+  if(!listening) return;
+  const d = new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteTimeDomainData(d);
+  let s=0; for(let i=0;i<d.length;i++) s+=Math.abs(d[i]-128);
+  document.getElementById('vuFill').style.width = Math.min((s/d.length/128)*300,100)+'%';
+  vuRaf = requestAnimationFrame(vuLoop);
+}
+
+function detectLoop(){
+  if(!listening) return;
+  const d = new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteTimeDomainData(d);
+  let s=0; for(let i=0;i<d.length;i++) s+=(d[i]-128)**2;
+  const rms = Math.sqrt(s/d.length)/128;
+  const thr = sensitivity/400;
+  const n = now();
+  if(rms>thr && (n-lastBeep)>cooldownMs){
+    lastBeep = n;
+    addEntry(n);
+    setStatus('on',`🔔 Arrivo #${entries.length}  ${fmt(n).slice(0,12)}`);
+    setTimeout(()=>{ if(listening) setStatus('on','in ascolto — attendo beep'); },2500);
+  }
+  setTimeout(detectLoop,30);
+}
+
+function onSens(){
+  sensitivity = +document.getElementById('sensSlider').value;
+  document.getElementById('sensVal').textContent = sensitivity;
+  document.getElementById('thrLine').style.left = sensitivity+'%';
+}
+
+function onCool(){
+  cooldownMs = +document.getElementById('coolSlider').value;
+  document.getElementById('coolVal').textContent = (cooldownMs/1000).toFixed(1)+'s';
+}
+
+function setStatus(cls,msg){
+  document.getElementById('sDot').className = 'sdot'+(cls?' '+cls:'');
+  document.getElementById('sText').textContent = msg;
+}
+
+// ── EXPORT ──────────────────────────────────────────────
+function buildCSV(){
+  const rows = [
+    ['Race Timer Export'],
+    ['Gun Start', gunMs?fmt(gunMs):''],
+    ['Ora export', fmt(now())],
+    ['Sincronizzazione', timeSynced ? `offset ${timeOffset>=0?'+':''}${timeOffset}ms` : 'orologio locale'],
+    [],
+    ['Pos','Nome/Pettorale','Ora Arrivo','Tempo Netto']
+  ];
+  getSorted().forEach((e,i) => rows.push([
+    i+1,
+    e.name||'#'+e.id,
+    e.str,
+    e.net!=null?fmtDur(e.net):''
+  ]));
+  return rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+}
+
+function exportCSV(){
+  if(!entries.length){ toast('Nessun dato da esportare'); return; }
+  const blob = new Blob(['\uFEFF'+buildCSV()],{type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download=`race_${new Date().toISOString().slice(0,19).replace(/[T:]/g,'-')}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+  toast(`✓ CSV scaricato (${entries.length} righe)`);
+}
+
+function exportClipboard(){
+  if(!entries.length){ toast('Nessun dato da esportare'); return; }
+  navigator.clipboard.writeText(buildCSV())
+    .then(()=>toast('✓ CSV copiato negli appunti'))
+    .catch(()=>toast('Errore copia'));
+}
+
+// ── TOAST ───────────────────────────────────────────────
+let toastTimer;
+function toast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>el.classList.remove('show'),2800);
+}
+</script>
+
+</body>
+</html>
+
