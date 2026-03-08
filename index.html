@@ -327,7 +327,7 @@ pointer-events: none;
 
 <div class="header">
   <div>
-    <div class="header-title">RACE TIMER</div>
+    <div class="header-title">RACE TIMER <span style="font-size:10px;color:#888;letter-spacing:0">v3</span></div>
     <div id="syncBadge" class="sync-badge off">orologio locale</div>
   </div>
   <div style="text-align:right">
@@ -341,15 +341,15 @@ pointer-events: none;
   <!-- SINCRONIZZAZIONE -->
 
   <div class="card">
-    <div class="card-head">🕐 Sincronizzazione Ora</div>
+    <div class="card-head">SINCRONIZZAZIONE ORA</div>
     <div class="card-body">
       <div class="big-time" id="syncDisplay">--:--:--.---</div>
       <div class="sub-row" id="offsetRow">nessun offset</div>
 
 ```
   <div class="btn-row" style="margin-bottom:10px">
-    <button class="btn btn-blue btn-sm" onclick="syncInternet()">🌐 Sync Internet</button>
-    <button class="btn btn-outline btn-sm" onclick="useLocalTime()">📱 Locale</button>
+    <button class="btn btn-blue btn-sm" onclick="syncInternet()">Sync Internet</button>
+    <button class="btn btn-outline btn-sm" onclick="useLocalTime()">Locale</button>
   </div>
 
   <div style="font-size:11px;font-weight:600;color:var(--mid);letter-spacing:1px;margin-bottom:6px">IMPOSTA ORA MANUALE</div>
@@ -385,10 +385,10 @@ pointer-events: none;
   <!-- GUN START -->
 
   <div class="card">
-    <div class="card-head">🔫 Gun Start</div>
+    <div class="card-head">GUN START</div>
     <div class="card-body">
       <div class="big-time unset" id="gunDisplay">non impostato</div>
-      <button class="btn btn-black btn-lg" onclick="setGunNow()">🔫 GUN NOW</button>
+      <button class="btn btn-black btn-lg" onclick="setGunNow()">GUN NOW</button>
 
 ```
   <div style="font-size:11px;font-weight:600;color:var(--mid);letter-spacing:1px;margin:10px 0 6px">IMPOSTA ORARIO GUN MANUALE</div>
@@ -424,10 +424,10 @@ pointer-events: none;
   <!-- BEEP -->
 
   <div class="card">
-    <div class="card-head">🎙 Rilevamento Beep</div>
+    <div class="card-head">RILEVAMENTO BEEP</div>
     <div class="card-body">
       <button class="btn btn-green btn-lg" id="btnListen" onclick="toggleListen()">
-        🎙 Attiva Ascolto
+        ATTIVA ASCOLTO
       </button>
 
 ```
@@ -456,7 +456,7 @@ pointer-events: none;
   </div>
 
   <button class="btn btn-outline btn-sm" style="margin-top:10px;width:100%" onclick="addManualBeep()">
-    ⊕ Aggiungi arrivo manuale
+    + Arrivo manuale
   </button>
 </div>
 ```
@@ -467,7 +467,7 @@ pointer-events: none;
 
   <div class="card">
     <div class="card-head">
-      🏁 Classifica
+      CLASSIFICA
       <span id="entryCount" style="color:var(--mid);font-weight:400"></span>
     </div>
 
@@ -506,13 +506,13 @@ pointer-events: none;
   <!-- ESPORTA -->
 
   <div class="card">
-    <div class="card-head">📤 Esporta</div>
+    <div class="card-head">ESPORTA</div>
     <div class="card-body">
       <div class="export-grid">
-        <button class="btn btn-green btn-sm" onclick="exportCSV()">⬇ Scarica CSV</button>
-        <button class="btn btn-outline btn-sm" onclick="exportClipboard()">📋 Copia CSV</button>
-        <button class="btn btn-outline btn-sm" onclick="window.print()">🖨 Stampa</button>
-        <button class="btn btn-outline btn-sm" style="color:var(--red)" onclick="clearAll()">🗑 Svuota tutto</button>
+        <button class="btn btn-green btn-sm" onclick="exportCSV()">Scarica CSV</button>
+        <button class="btn btn-outline btn-sm" onclick="exportClipboard()">Copia CSV</button>
+        <button class="btn btn-outline btn-sm" onclick="window.print()">Stampa</button>
+        <button class="btn btn-outline btn-sm" style="color:var(--red)" onclick="clearAll()">Svuota tutto</button>
       </div>
     </div>
   </div>
@@ -646,7 +646,7 @@ let gunMs = null;
 
 function setGunNow(){
   gunMs = now(); updateGun(); recalc();
-  toast('🔫 Gun Start: '+fmt(gunMs).slice(0,12));
+  toast('GUN START: '+fmt(gunMs).slice(0,12));
 }
 
 function clearGun(){ gunMs = null; updateGun(); recalc(); }
@@ -787,7 +787,7 @@ async function startListen(){
     audioCtx.createMediaStreamSource(s).connect(analyser);
     listening = true;
     const b = document.getElementById('btnListen');
-    b.textContent = '🔴 Stop Ascolto';
+    b.textContent = 'STOP ASCOLTO';
     b.className = 'btn btn-red btn-lg';
     setStatus('on','in ascolto — attendo beep');
     vuLoop(); detectLoop();
@@ -803,7 +803,7 @@ function stopListen(){
   if(audioCtx) audioCtx.close();
   cancelAnimationFrame(vuRaf);
   const b = document.getElementById('btnListen');
-  b.textContent = '🎙 Attiva Ascolto';
+  b.textContent = 'ATTIVA ASCOLTO';
   b.className = 'btn btn-green btn-lg';
   setStatus('','microfono non attivo');
   document.getElementById('vuFill').style.width = '0%';
