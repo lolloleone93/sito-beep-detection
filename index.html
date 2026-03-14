@@ -1,0 +1,1700 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>GUN START TIMER</title>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+            from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, where, serverTimestamp, orderBy, getDocs }
+            from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        // ─── 🔧 CONFIGURAZIONE FIREBASE ──────────────────────────────────────────
+        // Sostituisci questi valori con quelli del tuo progetto Firebase!
+        const firebaseConfig = {
+            apiKey:            "INSERISCI_QUI_LA_TUA_API_KEY",
+            authDomain:        "INSERISCI_QUI.firebaseapp.com",
+            projectId:         "INSERISCI_QUI_IL_PROJECT_ID",
+            storageBucket:     "INSERISCI_QUI.appspot.com",
+            messagingSenderId: "INSERISCI_QUI",
+            appId:             "INSERISCI_QUI"
+        };
+        // ─────────────────────────────────────────────────────────────────────────
+
+        const app  = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db   = getFirestore(app);
+
+        // Expose to window so non-module code can use them
+        window._auth = auth;
+        window._db   = db;
+        window._fns  = { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut,
+                         onAuthStateChanged, collection, addDoc, onSnapshot, deleteDoc,
+                         doc, query, where, serverTimestamp, orderBy, getDocs };
+
+        // Bootstrap once Firebase is ready
+        window.addEventListener('DOMContentLoaded', () => {
+            onAuthStateChanged(auth, user => {
+                if (user) showApp(user);
+                else      showAuth();
+            });
+        });
+    </script>
+
+    <style>
+        :root {
+            --red:      #D40018;
+            --red-glow: rgba(212,0,24,0.15);
+            --bg:       #F2F2F2;
+            --s1:       #FFFFFF;
+            --s2:       #EBEBEB;
+            --border:   #D8D8D8;
+            --text:     #111111;
+            --muted:    #888888;
+            --green:    #007A3D;
+            --yellow:   #996600;
+            --blue:     #1A5FBF;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Barlow Condensed', sans-serif;
+            min-height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* ── SCREENS ── */
+        .screen { width: 100%; max-width: 500px; padding: 24px 16px 60px; display: none; flex-direction: column; align-items: center; }
+        .screen.active { display: flex; }
+
+        /* ── AUTH SCREEN ── */
+        .logo {
+            font-size: clamp(36px,10vw,60px);
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            color: var(--red);
+            margin: 40px 0 6px;
+            text-transform: uppercase;
+        }
+        .logo-sub {
+            font-size: 12px;
+            letter-spacing: 0.3em;
+            color: var(--muted);
+            text-transform: uppercase;
+            margin-bottom: 48px;
+        }
+
+        .auth-card {
+            width: 100%;
+            background: var(--s1);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 28px 24px;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.08);
+        }
+
+        .auth-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 24px;
+            background: var(--s2);
+            border-radius: 10px;
+            padding: 4px;
+        }
+        .auth-tab {
+            flex: 1;
+            padding: 8px;
+            text-align: center;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            border: none;
+            background: transparent;
+            color: var(--muted);
+            border-radius: 7px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .auth-tab.active { background: var(--red); color: #fff; }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 14px;
+        }
+        .field label {
+            font-size: 11px;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+        .field input {
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--s2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .field input:focus { border-color: var(--red); }
+
+        .btn-auth {
+            width: 100%;
+            margin-top: 8px;
+            padding: 14px;
+            background: var(--red);
+            border: none;
+            border-radius: 10px;
+            color: #fff;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: opacity 0.15s, transform 0.1s;
+        }
+        .btn-auth:active { transform: scale(0.98); opacity: 0.9; }
+        .btn-auth:disabled { opacity: 0.5; cursor: default; }
+
+        .auth-error {
+            margin-top: 12px;
+            padding: 10px 12px;
+            background: rgba(212,0,24,0.07);
+            border: 1px solid rgba(212,0,24,0.25);
+            border-radius: 8px;
+            font-size: 13px;
+            color: var(--red);
+            display: none;
+        }
+        .auth-error.show { display: block; }
+
+        /* ── APP SCREEN ── */
+        .app-header {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 0 10px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 14px;
+        }
+        .app-title {
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            color: var(--red);
+        }
+        .user-pill {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .user-email {
+            font-size: 11px;
+            color: var(--muted);
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .btn-logout {
+            padding: 4px 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: transparent;
+            color: var(--muted);
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 12px;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .btn-logout:hover { border-color: var(--red); color: var(--red); }
+
+        /* Clock */
+        .clock-panel {
+            width: 100%;
+            background: var(--s1);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 18px;
+            margin-bottom: 12px;
+            box-shadow: 0 1px 8px rgba(0,0,0,0.06);
+        }
+        .clock-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        #localTime {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: clamp(26px, 7vw, 38px);
+            color: var(--green);
+            text-shadow: none;
+        }
+        .sync-status {
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-family: 'Share Tech Mono', monospace;
+            white-space: nowrap;
+        }
+        .sync-status.synced { background: rgba(0,122,61,0.1); color: var(--green); border: 1px solid rgba(0,122,61,0.3); }
+        .sync-status.manual { background: rgba(153,102,0,0.1); color: var(--yellow); border: 1px solid rgba(153,102,0,0.3); }
+        .sync-status.error  { background: rgba(212,0,24,0.08); color: var(--red);   border: 1px solid rgba(212,0,24,0.25); }
+
+        .action-row { display: flex; gap: 8px; width: 100%; margin-top: 10px; }
+        .btn-small {
+            flex: 1;
+            padding: 8px 6px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--s2);
+            color: var(--text);
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .btn-small.primary { border-color: rgba(153,102,0,0.4); color: var(--yellow); }
+        .btn-small.primary:hover { background: rgba(153,102,0,0.08); }
+
+        /* Manual panel */
+        .manual-panel {
+            width: 100%;
+            background: var(--s1);
+            border: 1px solid var(--yellow);
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin-bottom: 12px;
+            display: none;
+        }
+        .manual-panel.open { display: block; animation: slideDown 0.2s ease; }
+        @keyframes slideDown { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
+        .manual-panel h3 { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--yellow); margin-bottom: 10px; }
+        .time-inputs { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+        .time-input-group { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+        .time-input-group label { font-size: 10px; text-transform: uppercase; color: var(--muted); letter-spacing: 0.1em; }
+        .time-input-group input {
+            width: 100%; padding: 8px 4px;
+            background: var(--s2); border: 1px solid var(--border); border-radius: 6px;
+            color: var(--text); font-family: 'Share Tech Mono', monospace; font-size: 18px;
+            text-align: center; outline: none;
+        }
+        .time-input-group input:focus { border-color: var(--yellow); }
+        .time-sep { font-size: 20px; color: var(--muted); margin-top: 14px; }
+        .btn-apply {
+            width: 100%; padding: 10px; background: var(--yellow); color: #000;
+            border: none; border-radius: 8px;
+            font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 700;
+            letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer;
+        }
+
+        /* Input */
+        .input-section { width: 100%; margin-bottom: 12px; }
+        .input-label { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+        #numberInput {
+            width: 100%; padding: 12px 16px;
+            background: var(--s1); border: 1px solid var(--border); border-radius: 10px;
+            color: var(--text); font-family: 'Share Tech Mono', monospace; font-size: 22px;
+            text-align: center; outline: none; transition: border-color 0.2s;
+        }
+        #numberInput:focus { border-color: var(--red); box-shadow: 0 0 0 2px var(--red-glow); }
+
+        /* BIG BUTTON */
+        #startBtn {
+            width: 100%;
+            height: clamp(110px, 26vw, 160px);
+            background: var(--red);
+            border: none; border-radius: 16px;
+            color: #fff;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: clamp(36px, 9vw, 58px);
+            font-weight: 800;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            cursor: pointer;
+            position: relative; overflow: hidden;
+            box-shadow: 0 6px 24px rgba(212,0,24,0.28), 0 2px 6px rgba(0,0,0,0.1);
+            transition: transform 0.1s, box-shadow 0.1s;
+            margin-bottom: 10px;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+        #startBtn::before {
+            content: '';
+            position: absolute; inset: 0;
+            background: linear-gradient(170deg, rgba(255,255,255,0.13) 0%, transparent 55%);
+            pointer-events: none;
+        }
+        #startBtn:active, #startBtn.pressed { transform: scale(0.97); box-shadow: 0 3px 12px rgba(212,0,24,0.2); }
+        #startBtn .btn-hint { display: block; font-size: clamp(10px,2.5vw,13px); font-weight: 600; letter-spacing: 0.2em; opacity: 0.65; margin-top: 4px; }
+
+        .ripple {
+            position: absolute; border-radius: 50%;
+            background: rgba(255,255,255,0.28);
+            transform: scale(0);
+            animation: ripple-anim 0.55s linear;
+            pointer-events: none;
+        }
+        @keyframes ripple-anim { to { transform: scale(4); opacity: 0; } }
+
+        .vol-hint { font-size: 11px; color: var(--muted); text-align: center; margin-bottom: 16px; letter-spacing: 0.05em; }
+
+        #resetBtn {
+            width: 100%; padding: 11px;
+            background: transparent; border: 1px solid var(--border); border-radius: 10px;
+            color: var(--muted);
+            font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 600;
+            letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer;
+            margin-bottom: 20px; transition: all 0.15s;
+        }
+        #resetBtn:hover { border-color: var(--red); color: var(--red); }
+
+        .btn-manual-gs {
+            width: 100%; padding: 11px;
+            background: transparent; border: 1px solid rgba(26,95,191,0.35); border-radius: 10px;
+            color: var(--blue);
+            font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 600;
+            letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer;
+            margin-bottom: 10px; transition: all 0.15s;
+        }
+        .btn-manual-gs:hover { background: rgba(26,95,191,0.06); }
+
+        /* Timer list */
+        #output { width: 100%; display: flex; flex-direction: column; gap: 10px; }
+
+        .timer-entry {
+            background: var(--s1);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--red);
+            border-radius: 10px;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            animation: entryIn 0.25s ease;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+        }
+        @keyframes entryIn { from { opacity:0; transform:translateX(-12px); } to { opacity:1; transform:translateX(0); } }
+
+        .entry-left { display: flex; flex-direction: column; gap: 3px; }
+        .entry-number { font-size: 22px; font-weight: 800; color: var(--red); }
+        .entry-start { font-size: 11px; color: var(--muted); font-family: 'Share Tech Mono', monospace; }
+        .entry-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+        .entry-counter {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: clamp(20px, 5vw, 28px);
+            color: var(--green);
+            text-shadow: none;
+        }
+        .btn-delete {
+            padding: 3px 8px;
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            background: transparent;
+            color: var(--muted);
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-family: 'Barlow Condensed', sans-serif;
+            letter-spacing: 0.05em;
+        }
+        .btn-delete:hover { border-color: var(--red); color: var(--red); }
+
+        /* Loading */
+        .loader {
+            width: 100%; text-align: center;
+            padding: 60px 0;
+            font-size: 13px;
+            letter-spacing: 0.2em;
+            color: var(--muted);
+            text-transform: uppercase;
+        }
+        .loader::after {
+            content: '';
+            display: block;
+            width: 32px; height: 32px;
+            border: 2px solid var(--border);
+            border-top-color: var(--red);
+            border-radius: 50%;
+            margin: 16px auto 0;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .arr-actions {
+            display: flex;
+            gap: 8px;
+        }
+        .btn-arr-action {
+            flex: 1;
+            padding: 9px 6px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--s2);
+            color: var(--text);
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-align: center;
+        }
+        .btn-arr-action:hover { background: var(--s1); border-color: var(--text); }
+        .btn-arr-action.danger { color: var(--red); border-color: rgba(212,0,24,0.3); }
+        .btn-arr-action.danger:hover { background: rgba(212,0,24,0.06); border-color: var(--red); }
+        .btn-arr-action.export { color: var(--blue); border-color: rgba(26,95,191,0.3); }
+        .btn-arr-action.export:hover { background: rgba(26,95,191,0.06); border-color: var(--blue); }
+
+        /* ── ARRIVALS COLUMNS ── */
+        .arrivals-left-col  { width: 100%; display: flex; flex-direction: column; gap: 12px; }
+        .arrivals-right-col { width: 100%; display: flex; flex-direction: column; gap: 10px; }
+
+        /* ── DESKTOP LAYOUT ── */
+        @media (min-width: 900px) {
+            body { padding: 0; }
+            .screen { max-width: 1200px; padding: 24px 32px 60px; }
+            #tabArrivi { flex-direction: row !important; align-items: flex-start; gap: 28px; flex-wrap: wrap; }
+            .arrivals-left-col { width: 340px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px; }
+            .arrivals-right-col { flex: 1; min-width: 320px; display: flex; flex-direction: column; gap: 10px; }
+            #btnArrival { height: clamp(90px, 12vw, 130px); font-size: clamp(24px, 3vw, 38px); }
+            #arrivalInput { font-size: 24px; padding: 14px; }
+            .app-header { max-width: 100%; }
+            .nav-tabs { max-width: 100%; }
+        }
+        .nav-tabs {
+            width: 100%;
+            display: flex;
+            background: var(--s1);
+            border-bottom: 2px solid var(--border);
+            margin-bottom: 14px;
+        }
+        .nav-tab {
+            flex: 1;
+            padding: 12px 8px;
+            text-align: center;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 15px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            border: none;
+            background: transparent;
+            color: var(--muted);
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.15s;
+        }
+        .nav-tab.active { color: var(--red); border-bottom-color: var(--red); }
+
+        /* ── TAB PANELS ── */
+        .tab-panel { display: none; width: 100%; flex-direction: column; align-items: center; }
+        .tab-panel.active { display: flex; }
+
+        /* ── ARRIVALS ── */
+        .gunstart-selector {
+            width: 100%;
+            background: var(--s1);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 1px 8px rgba(0,0,0,0.06);
+        }
+        .selector-label {
+            font-size: 11px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+        .gs-options { display: flex; flex-direction: column; gap: 6px; }
+        .gs-option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            background: var(--s2);
+            border: 2px solid transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .gs-option:hover { border-color: var(--border); }
+        .gs-option.selected { border-color: var(--red); background: rgba(212,0,24,0.04); }
+        .gs-option-dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: var(--border);
+            flex-shrink: 0;
+            transition: background 0.15s;
+        }
+        .gs-option.selected .gs-option-dot { background: var(--red); }
+        .gs-option-info { flex: 1; }
+        .gs-option-time {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 16px;
+            color: var(--text);
+            font-weight: 600;
+        }
+        .gs-option-label {
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 1px;
+        }
+        .gs-option-elapsed {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 13px;
+            color: var(--green);
+        }
+        .gs-empty {
+            font-size: 13px;
+            color: var(--muted);
+            text-align: center;
+            padding: 12px 0;
+            font-style: italic;
+        }
+
+        /* Arrival input big */
+        #arrivalInput {
+            width: 100%; padding: 16px;
+            background: var(--s1); border: 2px solid var(--border); border-radius: 12px;
+            color: var(--text); font-family: 'Share Tech Mono', monospace; font-size: 28px;
+            text-align: center; outline: none; transition: border-color 0.2s;
+            margin-bottom: 10px;
+            box-shadow: 0 1px 8px rgba(0,0,0,0.06);
+        }
+        #arrivalInput:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(0,122,61,0.1); }
+
+        #btnArrival {
+            width: 100%;
+            height: clamp(80px, 18vw, 110px);
+            background: var(--green);
+            border: none; border-radius: 14px;
+            color: #fff;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: clamp(28px, 7vw, 44px);
+            font-weight: 800;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            cursor: pointer;
+            position: relative; overflow: hidden;
+            box-shadow: 0 6px 20px rgba(0,122,61,0.25);
+            transition: transform 0.1s, box-shadow 0.1s;
+            margin-bottom: 16px;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+        #btnArrival:active { transform: scale(0.97); box-shadow: 0 3px 10px rgba(0,122,61,0.2); }
+        #btnArrival:disabled { opacity: 0.4; cursor: default; }
+
+        /* Arrivals list */
+        #arrivalsList { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+
+        /* Group color palette — applied via inline style on border-left */
+        .arrival-entry {
+            background: var(--s1);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--green);
+            border-radius: 10px;
+            padding: 10px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+            animation: entryIn 0.2s ease;
+        }
+        .arr-top { display: flex; align-items: center; justify-content: space-between; }
+        .arr-left { display: flex; flex-direction: column; gap: 2px; }
+        .arr-number { font-size: 20px; font-weight: 800; color: var(--text); }
+        .arr-number-input {
+            font-size: 20px; font-weight: 800; color: var(--text);
+            background: transparent; border: none; border-bottom: 2px dashed transparent;
+            outline: none; padding: 0; width: 80px;
+            font-family: 'Barlow Condensed', sans-serif;
+            transition: border-color 0.15s;
+            cursor: text;
+        }
+        .arr-number-input:hover  { border-bottom-color: var(--border); }
+        .arr-number-input:focus  { border-bottom-color: var(--blue); cursor: text; }
+        .arr-times { font-size: 11px; color: var(--muted); font-family: 'Share Tech Mono', monospace; }
+        .arr-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+        .arr-result {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: clamp(18px, 4.5vw, 24px);
+            font-weight: 700;
+            color: var(--green);
+        }
+        .arr-rank {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--muted);
+            letter-spacing: 0.05em;
+        }
+        .arr-rank.gold   { color: #B8860B; }
+        .arr-rank.silver { color: #666; }
+        .arr-rank.bronze { color: #8B4513; }
+
+        .arr-bottom {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .arr-gs-select {
+            flex: 1;
+            padding: 5px 8px;
+            background: var(--s2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            outline: none;
+            cursor: pointer;
+            transition: border-color 0.15s;
+        }
+        .arr-gs-select:focus { border-color: var(--blue); }
+        .arr-delete {
+            padding: 4px 9px;
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            background: transparent;
+            color: var(--muted);
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-family: 'Barlow Condensed', sans-serif;
+            white-space: nowrap;
+        }
+        .arr-delete:hover { border-color: var(--red); color: var(--red); }
+
+        /* Filter bar */
+        .filter-bar {
+            width: 100%;
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+        .filter-chip {
+            padding: 5px 12px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: var(--s2);
+            color: var(--muted);
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+        .filter-chip.active { color: #fff; border-color: transparent; }
+
+        .section-title {
+            width: 100%;
+            font-size: 11px;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+
+        .group-badge {
+            display: inline-block;
+            padding: 1px 7px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            color: #fff;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ── LOADING ── -->
+<div id="screenLoading" class="screen active">
+    <div class="loader">Caricamento</div>
+</div>
+
+<!-- ── AUTH SCREEN ── -->
+<div id="screenAuth" class="screen">
+    <div class="logo">⚡ Gun Start</div>
+    <div class="logo-sub">Race Timer System</div>
+
+    <div class="auth-card">
+        <div class="auth-tabs">
+            <button class="auth-tab active" onclick="switchTab('login')">Accedi</button>
+            <button class="auth-tab" onclick="switchTab('register')">Registrati</button>
+        </div>
+
+        <div class="field">
+            <label>Email</label>
+            <input type="email" id="authEmail" placeholder="la-tua@email.com" autocomplete="email">
+        </div>
+        <div class="field">
+            <label>Password</label>
+            <input type="password" id="authPassword" placeholder="••••••••" autocomplete="current-password">
+        </div>
+
+        <button class="btn-auth" id="btnAuth" onclick="handleAuth()">Accedi</button>
+        <div class="auth-error" id="authError"></div>
+    </div>
+</div>
+
+<!-- ── APP SCREEN ── -->
+<div id="screenApp" class="screen">
+    <div class="app-header">
+        <div class="app-title">⚡ Gun Start</div>
+        <div class="user-pill">
+            <span class="user-email" id="userEmail"></span>
+            <button class="btn-logout" onclick="handleLogout()">Esci</button>
+        </div>
+    </div>
+
+    <!-- Nav tabs -->
+    <div class="nav-tabs">
+        <button class="nav-tab active" onclick="switchAppTab('partenze')">🚀 Partenze</button>
+        <button class="nav-tab" onclick="switchAppTab('arrivi')">🏁 Arrivi</button>
+    </div>
+
+    <!-- ── TAB: PARTENZE ── -->
+    <div class="tab-panel active" id="tabPartenze">
+
+        <!-- Clock -->
+        <div class="clock-panel">
+            <div class="clock-row">
+                <span style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted)">Ora corrente</span>
+                <span id="syncStatus" class="sync-status manual">Locale</span>
+            </div>
+            <div class="clock-row" style="margin-top:4px">
+                <span id="localTime">00:00:00</span>
+            </div>
+            <div class="action-row">
+                <button class="btn-small primary" onclick="syncTimeAPI()">🌐 Sincronizza NTP</button>
+                <button class="btn-small" onclick="toggleManualPanel()">✏️ Imposta Ora</button>
+            </div>
+        </div>
+
+        <!-- Manual time -->
+        <div class="manual-panel" id="manualPanel">
+            <h3>⏱ Imposta orario manuale</h3>
+            <div class="time-inputs">
+                <div class="time-input-group"><label>Ore</label><input type="number" id="manualHH" min="0" max="23" placeholder="HH"></div>
+                <span class="time-sep">:</span>
+                <div class="time-input-group"><label>Min</label><input type="number" id="manualMM" min="0" max="59" placeholder="MM"></div>
+                <span class="time-sep">:</span>
+                <div class="time-input-group"><label>Sec</label><input type="number" id="manualSS" min="0" max="59" placeholder="SS"></div>
+            </div>
+            <button class="btn-apply" onclick="applyManualTime()">✔ Applica</button>
+        </div>
+
+        <!-- Input categoria -->
+        <div class="input-section">
+            <div class="input-label">Nome categoria</div>
+            <input type="text" id="numberInput" placeholder="Es: Élite, Junior, Cat. A…" autocomplete="off">
+        </div>
+
+        <!-- BIG BUTTON -->
+        <button id="startBtn" onclick="handleButtonClick(event)">
+            AVVIA
+        </button>
+
+        <!-- Manual Gun Start panel -->
+        <div class="manual-panel" id="manualGsPanel">
+            <h3>🕐 Imposta Gun Start manuale</h3>
+            <p style="font-size:12px;color:var(--muted);margin-bottom:10px;">Inserisci l'ora in cui è già partita la gara — il counter partirà dalla differenza con l'ora attuale.</p>
+            <div class="time-inputs">
+                <div class="time-input-group"><label>Ore</label><input type="number" id="gsManualHH" min="0" max="23" placeholder="HH"></div>
+                <span class="time-sep">:</span>
+                <div class="time-input-group"><label>Min</label><input type="number" id="gsManualMM" min="0" max="59" placeholder="MM"></div>
+                <span class="time-sep">:</span>
+                <div class="time-input-group"><label>Sec</label><input type="number" id="gsManualSS" min="0" max="59" placeholder="SS"></div>
+            </div>
+            <button class="btn-apply" onclick="addManualGunStart()">✔ Aggiungi Gun Start</button>
+        </div>
+
+        <button class="btn-manual-gs" onclick="toggleManualGsPanel()">🕐 Gun Start manuale</button>
+
+        <button id="resetBtn" onclick="resetTimers()">⟳ Reset tutti i timer</button>
+
+        <div id="output"></div>
+    </div>
+
+    <!-- ── TAB: ARRIVI ── -->
+    <div class="tab-panel" id="tabArrivi">
+
+        <!-- LEFT COL: input + gun start selector -->
+        <div class="arrivals-left-col">
+
+            <!-- Seleziona Gun Start -->
+            <div class="gunstart-selector">
+                <div class="selector-label">Gun Start di riferimento</div>
+                <div class="gs-options" id="gsOptions">
+                    <div class="gs-empty">Nessun Gun Start attivo</div>
+                </div>
+            </div>
+
+            <!-- Input pettorale arrivo -->
+            <div class="input-section" style="margin-bottom:0">
+                <div class="input-label">Numero pettorale in arrivo</div>
+                <input type="number" id="arrivalInput" placeholder="Lascia vuoto → auto" inputmode="numeric">
+            </div>
+
+            <!-- REGISTRA ARRIVO button -->
+            <button id="btnArrival" onclick="handleArrival()" disabled>
+                REGISTRA ARRIVO
+            </button>
+
+            <!-- Utility buttons -->
+            <div class="arr-actions">
+                <button class="btn-arr-action" onclick="resetArrivalCounter()" title="Reset contatore pettorale">↺ Reset #</button>
+                <button class="btn-arr-action danger" onclick="clearArrivals()" title="Cancella classifica">🗑 Clear</button>
+                <button class="btn-arr-action export" onclick="exportCSV()" title="Esporta CSV">⬇ CSV</button>
+            </div>
+
+        </div>
+
+        <!-- RIGHT COL: filter + classifica -->
+        <div class="arrivals-right-col">
+
+            <!-- Filter chips -->
+            <div class="filter-bar" id="filterBar" style="display:none"></div>
+
+            <!-- Lista arrivi -->
+            <div class="section-title" id="arrivalsTitle" style="display:none">Classifica arrivi</div>
+            <div id="arrivalsList"></div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    // ─── Helpers screen ───────────────────────────────────────────────────────
+    function showScreen(id) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+    }
+
+    // ─── Auth tab ─────────────────────────────────────────────────────────────
+    let authMode = 'login';
+    function switchTab(mode) {
+        authMode = mode;
+        document.querySelectorAll('.auth-tab').forEach((t,i) => t.classList.toggle('active', (i===0&&mode==='login')||(i===1&&mode==='register')));
+        document.getElementById('btnAuth').textContent = mode === 'login' ? 'Accedi' : 'Registrati';
+        document.getElementById('authError').classList.remove('show');
+    }
+
+    async function handleAuth() {
+        const { createUserWithEmailAndPassword, signInWithEmailAndPassword } = window._fns;
+        const auth = window._auth;
+        const email = document.getElementById('authEmail').value.trim();
+        const pass  = document.getElementById('authPassword').value;
+        const errEl = document.getElementById('authError');
+        const btn   = document.getElementById('btnAuth');
+
+        if (!email || !pass) { showError('Compila tutti i campi.'); return; }
+
+        btn.disabled = true;
+        btn.textContent = '...';
+        errEl.classList.remove('show');
+
+        try {
+            if (authMode === 'login') {
+                await signInWithEmailAndPassword(auth, email, pass);
+            } else {
+                await createUserWithEmailAndPassword(auth, email, pass);
+            }
+        } catch(e) {
+            btn.disabled = false;
+            btn.textContent = authMode === 'login' ? 'Accedi' : 'Registrati';
+            const msgs = {
+                'auth/user-not-found':      'Nessun account con questa email.',
+                'auth/wrong-password':      'Password errata.',
+                'auth/email-already-in-use':'Email già registrata. Prova ad accedere.',
+                'auth/weak-password':       'Password troppo corta (min. 6 caratteri).',
+                'auth/invalid-email':       'Email non valida.',
+                'auth/invalid-credential':  'Email o password errati.',
+            };
+            showError(msgs[e.code] || ('Errore: ' + e.message));
+        }
+    }
+
+    function showError(msg) {
+        const el = document.getElementById('authError');
+        el.textContent = msg;
+        el.classList.add('show');
+    }
+
+    function handleLogout() {
+        const { signOut } = window._fns;
+        stopAllCounters();
+        signOut(window._auth);
+    }
+
+    // ─── App init ─────────────────────────────────────────────────────────────
+    let currentUser = null;
+    let unsubscribeTimers = null;
+    let unsubscribeArrivals = null;
+    let intervalIds = [];
+    let timeOffset = 0;
+    let activeGunStarts = [];
+    let selectedGunStartId = null;
+    let gsElapsedTimers = [];
+
+    function showAuth() {
+        currentUser = null;
+        if (unsubscribeTimers)   { unsubscribeTimers();   unsubscribeTimers = null; }
+        if (unsubscribeArrivals) { unsubscribeArrivals(); unsubscribeArrivals = null; }
+        stopAllCounters();
+        gsElapsedTimers.forEach(clearInterval); gsElapsedTimers = [];
+        document.getElementById('output').innerHTML = '';
+        showScreen('screenAuth');
+    }
+
+    function showApp(user) {
+        currentUser = user;
+        document.getElementById('userEmail').textContent = user.email;
+        showScreen('screenApp');
+        startClockTick();
+        listenToTimers(user.uid);
+        listenToArrivals(user.uid);
+    }
+
+    // ─── Clock ────────────────────────────────────────────────────────────────
+    let clockStarted = false;
+    function startClockTick() {
+        if (clockStarted) return;
+        clockStarted = true;
+        updateLocalTime();
+        setInterval(updateLocalTime, 500);
+    }
+
+    function trueNow() { return Date.now() + timeOffset; }
+    function trueDate() { return new Date(trueNow()); }
+
+    function updateLocalTime() {
+        const el = document.getElementById('localTime');
+        if (el) el.textContent = trueDate().toLocaleTimeString('it-IT');
+    }
+
+    // ─── NTP ──────────────────────────────────────────────────────────────────
+    async function syncTimeAPI() {
+        const btn = document.querySelector('.btn-small.primary');
+        btn.textContent = '⏳ Sync...';
+        btn.disabled = true;
+        const apis = [
+            'https://timeapi.io/api/time/current/zone?timeZone=Europe/Rome',
+            'https://worldtimeapi.org/api/timezone/Europe/Rome'
+        ];
+        for (const url of apis) {
+            try {
+                const t0 = Date.now();
+                const res = await fetch(url);
+                if (!res.ok) continue;
+                const data = await res.json();
+                const t1 = Date.now();
+                const iso = data.datetime || data.dateTime;
+                if (!iso) continue;
+                timeOffset = (new Date(iso).getTime() + (t1-t0)/2) - t1;
+                setSyncStatus('ntp','✓ NTP');
+                btn.textContent = '✓ Sync!';
+                setTimeout(() => { btn.textContent = '🌐 Sincronizza NTP'; btn.disabled = false; }, 2000);
+                return;
+            } catch(_) {}
+        }
+        setSyncStatus('error','✗ Errore');
+        btn.textContent = '🌐 Sincronizza NTP';
+        btn.disabled = false;
+    }
+
+    function setSyncStatus(mode, label) {
+        const el = document.getElementById('syncStatus');
+        if (!el) return;
+        el.textContent = label;
+        el.className = 'sync-status ' + (mode==='ntp'?'synced':mode==='manual'?'manual':'error');
+    }
+
+    // ─── Manual time ──────────────────────────────────────────────────────────
+    function toggleManualPanel() {
+        const p = document.getElementById('manualPanel');
+        p.classList.toggle('open');
+        if (p.classList.contains('open')) {
+            const n = trueDate();
+            document.getElementById('manualHH').value = n.getHours();
+            document.getElementById('manualMM').value = n.getMinutes();
+            document.getElementById('manualSS').value = n.getSeconds();
+        }
+    }
+
+    function applyManualTime() {
+        const hh = parseInt(document.getElementById('manualHH').value)||0;
+        const mm = parseInt(document.getElementById('manualMM').value)||0;
+        const ss = parseInt(document.getElementById('manualSS').value)||0;
+        const target = new Date(); target.setHours(hh,mm,ss,0);
+        timeOffset = target.getTime() - Date.now();
+        setSyncStatus('manual','✏ Manuale');
+        document.getElementById('manualPanel').classList.remove('open');
+    }
+
+    function toggleManualGsPanel() {
+        const p = document.getElementById('manualGsPanel');
+        p.classList.toggle('open');
+        if (p.classList.contains('open')) {
+            const now = trueDate();
+            document.getElementById('gsManualHH').value = now.getHours();
+            document.getElementById('gsManualMM').value = now.getMinutes();
+            document.getElementById('gsManualSS').value = now.getSeconds();
+        }
+    }
+
+    async function addManualGunStart() {
+        const hh = parseInt(document.getElementById('gsManualHH').value);
+        const mm = parseInt(document.getElementById('gsManualMM').value);
+        const ss = parseInt(document.getElementById('gsManualSS').value);
+
+        if (isNaN(hh) || isNaN(mm) || isNaN(ss)) {
+            alert('Inserisci un orario valido.');
+            return;
+        }
+
+        const target = new Date();
+        target.setHours(hh, mm, ss, 0);
+        const startEpoch = target.getTime();
+
+        if (startEpoch > trueNow()) {
+            if (!confirm("L'orario inserito è nel futuro. Continuare?")) return;
+        }
+
+        const numVal = document.getElementById('numberInput').value.trim() || '—';
+        const tempId = 'temp-' + startEpoch;
+        renderTimerEntry(document.getElementById('output'), tempId, numVal, startEpoch);
+        document.getElementById('manualGsPanel').classList.remove('open');
+
+        try {
+            const { collection, addDoc } = window._fns;
+            await addDoc(collection(window._db, 'timers'), {
+                uid: currentUser.uid, number: numVal,
+                startEpoch: startEpoch,
+                createdAt: window._fns.serverTimestamp()
+            });
+        } catch(e) {
+            document.querySelector(`[data-doc-id="${tempId}"]`)?.remove();
+            alert('Errore salvataggio: ' + e.message);
+        }
+    }
+
+    // ─── Format ───────────────────────────────────────────────────────────────
+    function formatTime(sec) {
+        const h=Math.floor(sec/3600), m=Math.floor((sec%3600)/60), s=sec%60;
+        return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    }
+
+    function startCounter(display, startEpoch) {
+        function tick() {
+            const el = Math.floor((trueNow() - startEpoch) / 1000);
+            display.textContent = formatTime(Math.max(0, el));
+        }
+        tick();
+        const id = setInterval(tick, 100);
+        intervalIds.push(id);
+        return id;
+    }
+
+    function stopAllCounters() {
+        intervalIds.forEach(clearInterval);
+        intervalIds = [];
+    }
+
+    // ─── Firestore realtime ───────────────────────────────────────────────────
+    function listenToTimers(uid) {
+        const { collection, query, where, orderBy, onSnapshot } = window._fns;
+        const db = window._db;
+
+        const q = query(
+            collection(db, 'timers'),
+            where('uid', '==', uid),
+            orderBy('startEpoch', 'desc')
+        );
+
+        unsubscribeTimers = onSnapshot(q, snapshot => {
+            // Rimuovi entry temporanee, poi ridisegna quelle reali
+            document.querySelectorAll('[data-doc-id^="temp-"]').forEach(el => el.remove());
+            stopAllCounters();
+            const outputDiv = document.getElementById('output');
+            outputDiv.innerHTML = '';
+
+            // Aggiorna lista Gun Start attivi per il selettore Arrivi
+            activeGunStarts = [];
+            snapshot.forEach(docSnap => {
+                const d = docSnap.data();
+                activeGunStarts.push({ id: docSnap.id, number: d.number, startEpoch: d.startEpoch });
+                renderTimerEntry(outputDiv, docSnap.id, d.number, d.startEpoch);
+            });
+            updateGsSelector();
+        });
+    }
+
+    function renderTimerEntry(container, docId, number, startEpoch) {
+        const entry = document.createElement('div');
+        entry.className = 'timer-entry';
+        entry.dataset.docId = docId;
+
+        const left = document.createElement('div');
+        left.className = 'entry-left';
+
+        const num = document.createElement('div');
+        num.className = 'entry-number';
+        num.textContent = number !== '—' ? number : 'Partenza';
+
+        const started = document.createElement('div');
+        started.className = 'entry-start';
+        started.textContent = 'Gun start: ' + new Date(startEpoch).toLocaleTimeString('it-IT');
+
+        left.appendChild(num);
+        left.appendChild(started);
+
+        const right = document.createElement('div');
+        right.className = 'entry-right';
+
+        const counter = document.createElement('div');
+        counter.className = 'entry-counter';
+        counter.textContent = '00:00:00';
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn-delete';
+        delBtn.textContent = '✕ Elimina';
+        delBtn.onclick = () => deleteTimer(docId);
+
+        right.appendChild(counter);
+        right.appendChild(delBtn);
+
+        entry.appendChild(left);
+        entry.appendChild(right);
+        container.appendChild(entry);
+
+        startCounter(counter, startEpoch);
+    }
+
+    // ─── Add timer ────────────────────────────────────────────────────────────
+    async function handleButtonClick(event) {
+        if (!currentUser) return;
+
+        // ⚡ Cattura l'epoch SUBITO — prima di qualsiasi operazione async
+        const startEpoch = trueNow();
+        const numVal = document.getElementById('numberInput').value.trim() || '—';
+
+        // Ripple visivo
+        if (event) {
+            const btn = document.getElementById('startBtn');
+            const r = document.createElement('span');
+            r.className = 'ripple';
+            const rect = btn.getBoundingClientRect();
+            const size = Math.max(rect.width, rect.height);
+            const x = (event.clientX || rect.left+rect.width/2) - rect.left - size/2;
+            const y = (event.clientY || rect.top+rect.height/2) - rect.top - size/2;
+            r.style.cssText = `width:${size}px;height:${size}px;left:${x}px;top:${y}px`;
+            btn.appendChild(r);
+            setTimeout(() => r.remove(), 600);
+        }
+
+        // Mostra il timer IMMEDIATAMENTE nel DOM con id temporaneo
+        const tempId = 'temp-' + startEpoch;
+        renderTimerEntry(document.getElementById('output'), tempId, numVal, startEpoch);
+
+        // Salva su Firestore in background — onSnapshot sostituirà il temp
+        try {
+            const { collection, addDoc } = window._fns;
+            await addDoc(collection(window._db, 'timers'), {
+                uid:        currentUser.uid,
+                number:     numVal,
+                startEpoch: startEpoch,
+                createdAt:  window._fns.serverTimestamp()
+            });
+        } catch(e) {
+            document.querySelector(`[data-doc-id="${tempId}"]`)?.remove();
+            alert('Errore salvataggio: ' + e.message);
+        }
+    }
+
+    // ─── Delete timer ─────────────────────────────────────────────────────────
+    async function deleteTimer(docId) {
+        const { doc, deleteDoc } = window._fns;
+        try {
+            await deleteDoc(doc(window._db, 'timers', docId));
+        } catch(e) {
+            alert('Errore eliminazione: ' + e.message);
+        }
+    }
+
+    // ─── Reset all ────────────────────────────────────────────────────────────
+    async function resetTimers() {
+        if (!confirm('Vuoi eliminare tutti i tuoi timer?')) return;
+        const { collection, query, where, getDocs, deleteDoc, doc } = window._fns;
+        const q = query(collection(window._db, 'timers'), where('uid', '==', currentUser.uid));
+        const snap = await getDocs(q);
+        await Promise.all(snap.docs.map(d => deleteDoc(doc(window._db,'timers',d.id))));
+    }
+
+    // ─── App tab switching ────────────────────────────────────────────────────
+    function switchAppTab(tab) {
+        document.querySelectorAll('.nav-tab').forEach((t,i) =>
+            t.classList.toggle('active', (i===0&&tab==='partenze')||(i===1&&tab==='arrivi'))
+        );
+        document.getElementById('tabPartenze').classList.toggle('active', tab==='partenze');
+        document.getElementById('tabArrivi').classList.toggle('active', tab==='arrivi');
+    }
+
+    // ─── Arrivals state ───────────────────────────────────────────────────────
+
+    function updateGsSelector() {
+        const container = document.getElementById('gsOptions');
+        gsElapsedTimers.forEach(clearInterval);
+        gsElapsedTimers = [];
+        container.innerHTML = '';
+
+        if (activeGunStarts.length === 0) {
+            container.innerHTML = '<div class="gs-empty">Nessun Gun Start attivo — creane uno nella tab Partenze</div>';
+            selectedGunStartId = null;
+            document.getElementById('btnArrival').disabled = true;
+            return;
+        }
+
+        activeGunStarts.forEach(gs => {
+            const opt = document.createElement('div');
+            opt.className = 'gs-option' + (gs.id === selectedGunStartId ? ' selected' : '');
+            opt.onclick = () => selectGunStart(gs.id);
+
+            const dot = document.createElement('div');
+            dot.className = 'gs-option-dot';
+
+            const info = document.createElement('div');
+            info.className = 'gs-option-info';
+
+            const t = document.createElement('div');
+            t.className = 'gs-option-time';
+            t.textContent = new Date(gs.startEpoch).toLocaleTimeString('it-IT');
+
+            const lbl = document.createElement('div');
+            lbl.className = 'gs-option-label';
+            lbl.textContent = gs.number !== '—' ? gs.number : 'Partenza';
+
+            info.appendChild(t);
+            info.appendChild(lbl);
+
+            const elapsed = document.createElement('div');
+            elapsed.className = 'gs-option-elapsed';
+
+            opt.appendChild(dot);
+            opt.appendChild(info);
+            opt.appendChild(elapsed);
+            container.appendChild(opt);
+
+            // live elapsed counter in selector
+            function tickElapsed() {
+                const sec = Math.floor((trueNow() - gs.startEpoch) / 1000);
+                elapsed.textContent = formatTime(Math.max(0, sec));
+            }
+            tickElapsed();
+            gsElapsedTimers.push(setInterval(tickElapsed, 100));
+        });
+
+        // Auto-select first if nothing selected or selection gone
+        if (!selectedGunStartId || !activeGunStarts.find(g => g.id === selectedGunStartId)) {
+            selectGunStart(activeGunStarts[0].id);
+        }
+        // Refresh arrivals list so colors/dropdowns reflect updated gun starts
+        updateFilterBar();
+        renderArrivalsList();
+    }
+
+    function selectGunStart(id) {
+        selectedGunStartId = id;
+        document.querySelectorAll('.gs-option').forEach((el, i) => {
+            el.classList.toggle('selected', activeGunStarts[i]?.id === id);
+        });
+        document.getElementById('btnArrival').disabled = false;
+    }
+
+    // ─── Group color palette ──────────────────────────────────────────────────
+    const GROUP_COLORS = [
+        '#1A5FBF','#007A3D','#996600','#8B1A8B','#C45000','#006080','#8B1A3A','#3A6B00'
+    ];
+    function colorForGs(gsId) {
+        const idx = activeGunStarts.findIndex(g => g.id === gsId);
+        return GROUP_COLORS[Math.max(0, idx) % GROUP_COLORS.length];
+    }
+
+    // ─── Filter state ─────────────────────────────────────────────────────────
+    let currentFilter = 'all'; // 'all' | gunStartId
+    let allArrivals = [];      // full list from Firestore, ordered by arrivalEpoch asc
+
+    function setFilter(gsId) {
+        currentFilter = gsId;
+        document.querySelectorAll('.filter-chip').forEach(c => {
+            const cid = c.dataset.gsid || 'all';
+            const isActive = cid === gsId;
+            c.classList.toggle('active', isActive);
+            c.style.background = isActive ? (cid === 'all' ? 'var(--text)' : colorForGs(cid)) : '';
+            c.style.color = isActive ? '#fff' : '';
+        });
+        renderArrivalsList();
+    }
+
+    function updateFilterBar() {
+        const bar = document.getElementById('filterBar');
+        if (allArrivals.length === 0) { bar.style.display = 'none'; return; }
+        bar.style.display = 'flex';
+        bar.innerHTML = '';
+
+        const allChip = document.createElement('button');
+        allChip.className = 'filter-chip' + (currentFilter === 'all' ? ' active' : '');
+        allChip.textContent = 'Tutti';
+        allChip.dataset.gsid = 'all';
+        allChip.style.background = currentFilter === 'all' ? 'var(--text)' : '';
+        allChip.style.color = currentFilter === 'all' ? '#fff' : '';
+        allChip.onclick = () => setFilter('all');
+        bar.appendChild(allChip);
+
+        // One chip per gun start that has at least one arrival
+        const gsIds = [...new Set(allArrivals.map(a => a.gunStartId))];
+        gsIds.forEach(gsId => {
+            const gs = activeGunStarts.find(g => g.id === gsId);
+            const label = gs ? (gs.number !== '—' ? gs.number : new Date(gs.startEpoch).toLocaleTimeString('it-IT')) : 'Gruppo';
+            const color = colorForGs(gsId);
+            const chip = document.createElement('button');
+            chip.className = 'filter-chip' + (currentFilter === gsId ? ' active' : '');
+            chip.textContent = label;
+            chip.dataset.gsid = gsId;
+            chip.style.background = currentFilter === gsId ? color : '';
+            chip.style.color = currentFilter === gsId ? '#fff' : '';
+            chip.onclick = () => setFilter(gsId);
+            bar.appendChild(chip);
+        });
+    }
+
+    // ─── Listen to arrivals ───────────────────────────────────────────────────
+    function listenToArrivals(uid) {
+        const { collection, query, where, orderBy, onSnapshot } = window._fns;
+        unsubscribeArrivals = onSnapshot(
+            query(collection(window._db, 'arrivals'), where('uid','==',uid), orderBy('arrivalEpoch','asc')),
+            snapshot => {
+                document.querySelectorAll('[data-arr-id^="temp-arr-"]').forEach(el => el.remove());
+                allArrivals = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                // Keep auto-increment in sync with highest numeric pettorale
+                const nums = allArrivals.map(a => parseInt(a.number)).filter(n => !isNaN(n));
+                if (nums.length) arrivalCounter = Math.max(arrivalCounter, Math.max(...nums));
+                updateFilterBar();
+                renderArrivalsList();
+            }
+        );
+    }
+
+    function renderArrivalsList() {
+        const list = document.getElementById('arrivalsList');
+        const title = document.getElementById('arrivalsTitle');
+        list.innerHTML = '';
+
+        let filtered = currentFilter === 'all'
+            ? [...allArrivals]
+            : allArrivals.filter(a => a.gunStartId === currentFilter);
+
+        title.style.display = filtered.length === 0 && allArrivals.length === 0 ? 'none' : 'block';
+
+        // Rank within the filtered set (by arrivalEpoch asc = already sorted)
+        filtered.forEach((d, idx) => {
+            renderArrivalEntry(list, d.id, d, idx + 1);
+        });
+    }
+
+    function renderArrivalEntry(container, docId, d, rank, prepend = false) {
+        const diffSec = Math.floor((d.arrivalEpoch - d.gunStartEpoch) / 1000);
+        const color = d.gunStartId ? colorForGs(d.gunStartId) : 'var(--green)';
+
+        const entry = document.createElement('div');
+        entry.className = 'arrival-entry';
+        entry.dataset.arrId = docId;
+        entry.style.borderLeftColor = color;
+
+        // ── Top row ──
+        const top = document.createElement('div');
+        top.className = 'arr-top';
+
+        const left = document.createElement('div');
+        left.className = 'arr-left';
+
+        const numRow = document.createElement('div');
+        numRow.style.display = 'flex';
+        numRow.style.alignItems = 'center';
+
+        const num = document.createElement('input');
+        num.className = 'arr-number arr-number-input';
+        num.type = 'text';
+        num.value = d.number;
+        num.inputMode = 'numeric';
+        if (docId.startsWith('temp-')) num.disabled = true;
+        let prevVal = d.number;
+        num.onblur = () => {
+            const v = num.value.trim();
+            if (!v) { num.value = prevVal; return; }
+            if (v !== prevVal) { prevVal = v; changeArrivalNumber(docId, v); }
+        };
+        num.onkeydown = e => { if (e.key === 'Enter') num.blur(); };
+
+        // Group badge
+        if (d.gunStartId) {
+            const gs = activeGunStarts.find(g => g.id === d.gunStartId);
+            if (gs) {
+                const badge = document.createElement('span');
+                badge.className = 'group-badge';
+                badge.style.background = color;
+                badge.textContent = gs.number !== '—' ? gs.number : new Date(gs.startEpoch).toLocaleTimeString('it-IT', {hour:'2-digit',minute:'2-digit'});
+                numRow.appendChild(num);
+                numRow.appendChild(badge);
+            } else {
+                numRow.appendChild(num);
+            }
+        } else {
+            numRow.appendChild(num);
+        }
+
+        const times = document.createElement('div');
+        times.className = 'arr-times';
+        times.innerHTML = 'GS: ' + new Date(d.gunStartEpoch).toLocaleTimeString('it-IT') +
+            '&nbsp;→&nbsp;ARR: ' + new Date(d.arrivalEpoch).toLocaleTimeString('it-IT');
+
+        left.appendChild(numRow);
+        left.appendChild(times);
+
+        const right = document.createElement('div');
+        right.className = 'arr-right';
+
+        const result = document.createElement('div');
+        result.className = 'arr-result';
+        result.style.color = color;
+        result.textContent = formatTime(Math.max(0, diffSec));
+
+        // Rank badge
+        if (rank) {
+            const rankEl = document.createElement('div');
+            rankEl.className = 'arr-rank' + (rank===1?' gold':rank===2?' silver':rank===3?' bronze':'');
+            rankEl.textContent = rank === 1 ? '🥇 1°' : rank === 2 ? '🥈 2°' : rank === 3 ? '🥉 3°' : rank + '°';
+            right.appendChild(result);
+            right.appendChild(rankEl);
+        } else {
+            right.appendChild(result);
+        }
+
+        top.appendChild(left);
+        top.appendChild(right);
+
+        // ── Bottom row: GS dropdown + delete ──
+        const bottom = document.createElement('div');
+        bottom.className = 'arr-bottom';
+
+        const sel = document.createElement('select');
+        sel.className = 'arr-gs-select';
+        activeGunStarts.forEach(gs => {
+            const opt = document.createElement('option');
+            opt.value = gs.id;
+            opt.textContent = (gs.number !== '—' ? gs.number + ' — ' : '') + new Date(gs.startEpoch).toLocaleTimeString('it-IT');
+            opt.selected = gs.id === d.gunStartId;
+            sel.appendChild(opt);
+        });
+        if (activeGunStarts.length === 0) {
+            const opt = document.createElement('option');
+            opt.textContent = 'Nessun Gun Start';
+            sel.appendChild(opt);
+        }
+        sel.onchange = () => changeArrivalGs(docId, sel.value);
+
+        const del = document.createElement('button');
+        del.className = 'arr-delete';
+        del.textContent = '✕ Elimina';
+        del.onclick = () => deleteArrival(docId);
+
+        bottom.appendChild(sel);
+        bottom.appendChild(del);
+
+        entry.appendChild(top);
+        entry.appendChild(bottom);
+
+        if (prepend && container.firstChild) {
+            container.insertBefore(entry, container.firstChild);
+        } else {
+            container.appendChild(entry);
+        }
+    }
+
+    // ─── Change number on arrival ─────────────────────────────────────────────
+    async function changeArrivalNumber(docId, newNumber) {
+        if (docId.startsWith('temp-')) return;
+        try {
+            const { doc } = window._fns;
+            const { updateDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+            await updateDoc(doc(window._db, 'arrivals', docId), { number: newNumber });
+        } catch(e) { alert('Errore modifica pettorale: ' + e.message); }
+    }
+
+    // ─── Change GS on arrival ─────────────────────────────────────────────────
+    async function changeArrivalGs(docId, newGsId) {
+        const gs = activeGunStarts.find(g => g.id === newGsId);
+        if (!gs) return;
+        try {
+            const { doc } = window._fns;
+            const { updateDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+            await updateDoc(doc(window._db, 'arrivals', docId), {
+                gunStartId:    newGsId,
+                gunStartEpoch: gs.startEpoch
+            });
+        } catch(e) { alert('Errore modifica: ' + e.message); }
+    }
+
+    // ─── Register arrival ─────────────────────────────────────────────────────
+    let arrivalCounter = 0; // auto-increment for empty input
+
+    async function handleArrival() {
+        if (!selectedGunStartId) return;
+        const arrivalEpoch = trueNow();
+
+        // Auto-increment if empty
+        let numVal = document.getElementById('arrivalInput').value.trim();
+        if (!numVal) {
+            arrivalCounter++;
+            numVal = String(arrivalCounter);
+        }
+
+        const gs = activeGunStarts.find(g => g.id === selectedGunStartId);
+        if (!gs) return;
+
+        // Mostra SUBITO nella lista
+        const tempData = { number: numVal, gunStartId: selectedGunStartId, gunStartEpoch: gs.startEpoch, arrivalEpoch };
+        allArrivals.push({ id: 'temp-arr-' + arrivalEpoch, ...tempData });
+        updateFilterBar();
+        renderArrivalsList();
+
+        const btn = document.getElementById('btnArrival');
+        btn.textContent = '✓ ' + numVal + ' REGISTRATO!';
+        document.getElementById('arrivalInput').value = '';
+        document.getElementById('arrivalInput').focus();
+        setTimeout(() => { btn.textContent = 'REGISTRA ARRIVO'; }, 1200);
+
+        try {
+            const { collection, addDoc } = window._fns;
+            await addDoc(collection(window._db, 'arrivals'), {
+                uid: currentUser.uid, number: numVal,
+                gunStartId: selectedGunStartId, gunStartEpoch: gs.startEpoch,
+                arrivalEpoch, createdAt: window._fns.serverTimestamp()
+            });
+        } catch(e) {
+            allArrivals = allArrivals.filter(a => a.id !== 'temp-arr-' + arrivalEpoch);
+            renderArrivalsList();
+            alert('Errore salvataggio arrivo: ' + e.message);
+        }
+    }
+
+    async function deleteArrival(docId) {
+        if (docId.startsWith('temp-')) return;
+        const { doc, deleteDoc } = window._fns;
+        try { await deleteDoc(doc(window._db, 'arrivals', docId)); }
+        catch(e) { alert('Errore: ' + e.message); }
+    }
+
+    // ─── Reset auto-increment counter ─────────────────────────────────────────
+    function resetArrivalCounter() {
+        arrivalCounter = 0;
+        const btn = document.querySelector('.btn-arr-action');
+        const orig = btn.textContent;
+        btn.textContent = '✓ Reset!';
+        setTimeout(() => { btn.textContent = orig; }, 1000);
+    }
+
+    // ─── Clear all arrivals ───────────────────────────────────────────────────
+    async function clearArrivals() {
+        if (!confirm('Eliminare tutta la classifica arrivi?')) return;
+        const { collection, query, where, getDocs, deleteDoc, doc } = window._fns;
+        const q = query(collection(window._db, 'arrivals'), where('uid', '==', currentUser.uid));
+        const snap = await getDocs(q);
+        await Promise.all(snap.docs.map(d => deleteDoc(doc(window._db, 'arrivals', d.id))));
+        arrivalCounter = 0;
+    }
+
+    // ─── Export CSV ───────────────────────────────────────────────────────────
+    function exportCSV() {
+        if (allArrivals.length === 0) { alert('Nessun arrivo da esportare.'); return; }
+
+        const filtered = currentFilter === 'all'
+            ? [...allArrivals]
+            : allArrivals.filter(a => a.gunStartId === currentFilter);
+
+        const rows = [['Posizione','Pettorale','Gruppo','Gun Start','Ora Arrivo','Tempo Finale']];
+        filtered.forEach((d, i) => {
+            const gs = activeGunStarts.find(g => g.id === d.gunStartId);
+            const gruppo = gs ? (gs.number !== '—' ? gs.number : new Date(gs.startEpoch).toLocaleTimeString('it-IT')) : '';
+            const diffSec = Math.floor((d.arrivalEpoch - d.gunStartEpoch) / 1000);
+            rows.push([
+                i + 1,
+                d.number,
+                gruppo,
+                new Date(d.gunStartEpoch).toLocaleTimeString('it-IT'),
+                new Date(d.arrivalEpoch).toLocaleTimeString('it-IT'),
+                formatTime(Math.max(0, diffSec))
+            ]);
+        });
+
+        const csv = rows.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')).join('\n');
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'classifica_' + new Date().toLocaleDateString('it-IT').replace(/\//g,'-') + '.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    // Enter key on arrival input
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            const arrInput = document.getElementById('arrivalInput');
+            if (document.activeElement === arrInput) handleArrival();
+        }
+    });
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && document.getElementById('screenAuth').classList.contains('active')) {
+            handleAuth();
+        }
+    });
+</script>
+</body>
+</html>
